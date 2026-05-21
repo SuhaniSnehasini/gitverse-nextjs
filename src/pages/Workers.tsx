@@ -1,20 +1,30 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Server, Activity } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
-import { EmptyState } from "@/components/ui/EmptyState";
-import { Card, CardContent } from "@/components/ui/Card";
-import { Button } from "@/components/ui/Button";
+import { EmptyState, Card, CardContent, Button, Skeleton } from "@/components/ui";
 
 interface WorkerData {
   id: string;
   status: string;
+  load: number;
+  uptime: string;
 }
 
 export default function Workers() {
-  // Simulate an empty worker list
   const [workers, setWorkers] = useState<WorkerData[]>([]);
+  const [loading, setLoading] = useState(true);
+
+
+  useEffect(() => {
+    // Simulate API fetch
+    const timer = setTimeout(() => {
+      setWorkers([]);
+      setLoading(false);
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, []);
 
   return (
     <DashboardLayout>
@@ -38,7 +48,32 @@ export default function Workers() {
         {/* Content */}
         <Card className="glass">
           <CardContent className="pt-6">
-            {workers.length === 0 ? (
+            {loading ? (
+              <div className="space-y-4">
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <div key={i} className="flex items-center justify-between p-4 rounded-lg border border-border/50 glass">
+                    <div className="flex items-center gap-4 flex-1">
+                      <Skeleton className="h-12 w-12 rounded-full" />
+                      <div className="space-y-2 flex-1">
+                        <Skeleton className="h-4 w-1/4" />
+                        <Skeleton className="h-3 w-1/3" />
+                      </div>
+                    </div>
+                    <div className="flex gap-8">
+                      <div className="hidden sm:block space-y-2">
+                        <Skeleton className="h-3 w-12" />
+                        <Skeleton className="h-4 w-16" />
+                      </div>
+                      <div className="hidden sm:block space-y-2">
+                        <Skeleton className="h-3 w-12" />
+                        <Skeleton className="h-4 w-16" />
+                      </div>
+                      <Skeleton className="h-8 w-20 rounded-md" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : workers.length === 0 ? (
               <EmptyState
                 icon={Activity}
                 title="No Workers Active"
