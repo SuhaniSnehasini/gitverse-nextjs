@@ -220,6 +220,7 @@ model AnalysisJob {
   @@index([lockExpiresAt])
   @@index([repositoryId])
   @@index([userId])
+  @@index([status, lockExpiresAt, nextRunAt])
   @@map("analysis_jobs")
 }
 
