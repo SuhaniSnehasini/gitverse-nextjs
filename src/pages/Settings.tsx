@@ -479,7 +479,7 @@ export default function Settings() {
               <Card className="glass">
                 <CardContent className="pt-6 text-center space-y-4">
                   <div className="text-muted-foreground font-medium font-heading">No profile details found</div>
-                  <p className="text-sm text-muted-foreground">We couldn't retrieve any details for this account.</p>
+                  <p className="text-sm text-muted-foreground">We couldn&apos;t retrieve any details for this account.</p>
                   <Button onClick={fetchProfileDetails} variant="outline">
                     Reload
                   </Button>

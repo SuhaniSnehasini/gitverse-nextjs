@@ -56,12 +56,7 @@ export class HttpError extends Error {
 }
 
 export function isHttpError(error: unknown): error is HttpError {
-  return (
-    typeof error === "object" &&
-    error !== null &&
-    "status" in error &&
-    typeof (error as any).status === "number"
-  );
+  return error instanceof HttpError;
 }
 
 export async function middleware(request: NextRequest) {

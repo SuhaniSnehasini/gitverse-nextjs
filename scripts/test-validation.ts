@@ -279,7 +279,7 @@ async function runTests() {
   await test(
     "/api/ai/chat",
     "POST",
-    { repositoryId: 1 },
+    { repositoryId: "1" },
     400,
     "test-token",
   );
@@ -316,7 +316,7 @@ async function runTests() {
     "/api/ai/chat",
     "POST",
     {
-      repositoryId: 1,
+      repositoryId: "1",
       question: "Hello",
       conversationHistory: [null],
     },
@@ -329,7 +329,7 @@ async function runTests() {
     "/api/ai/chat",
     "POST",
     {
-      repositoryId: 1,
+      repositoryId: "1",
       question: "Hello",
       conversationHistory: [{ role: "system", content: "some instructions" }],
     },
