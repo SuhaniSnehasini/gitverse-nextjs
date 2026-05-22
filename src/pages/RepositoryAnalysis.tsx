@@ -177,7 +177,7 @@ export default function RepositoryAnalysis() {
       console.error("Error fetching repository:", error);
       toast({
         title: "Error fetching repository",
-        description: error.response?.data?.error || "Failed to load repository data.",
+        description: error.response?.data?.error || error.response?.data?.message || error.message || "Failed to load repository data.",
         variant: "destructive",
       });
     } finally {
@@ -208,12 +208,17 @@ export default function RepositoryAnalysis() {
       if (nextJob?.status === "FAILED") {
         toast({
           title: "Analysis failed",
-          description: nextJob?.error || "The repository analysis failed.",
+          description: nextJob?.error || nextJob?.progressMessage || "The repository analysis encountered an unexpected error.",
           variant: "destructive",
         });
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching analysis job:", error);
+      toast({
+        title: "Error checking analysis status",
+        description: error.response?.data?.error || error.response?.data?.message || error.message || "Failed to connect to the analysis service.",
+        variant: "destructive",
+      });
     }
   };
 
