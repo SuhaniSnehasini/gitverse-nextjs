@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { startAnalysisWorkerLoop } from '../../../../scripts/analysisWorker';
 
 export const dynamic = 'force-dynamic';
-export const maxDuration = 300; // max Vercel function duration (if supported by plan)
+export const maxDuration = 300;
 
 export async function GET(request: Request) {
   // Simple auth check for internal cron
@@ -29,19 +29,42 @@ export async function GET(request: Request) {
       once: maxJobs === undefined,
       maxJobs
     });
-    
-    console.log(`Finished analysis cron run. Summary:`, metrics);
-    
-    return NextResponse.json({ 
-      success: metrics.success, 
-      message: 'Analysis worker execution completed',
-      metrics
+
+    const workerElapsed = Date.now() - workerStart;
+    const totalElapsed = Date.now() - requestStart;
+
+    console.log(
+      `[run-analysis] Worker completed successfully in ${workerElapsed}ms`
+    );
+
+    return NextResponse.json({
+      success: true,
+      message: 'Analysis cron completed successfully',
+      workerElapsedMs: workerElapsed,
+      totalElapsedMs: totalElapsed,
+      timeBudgetMs,
     });
-  } catch (error: any) {
-    console.error('run-analysis cron error:', error instanceof Error ? error.message : "Unknown error");
-    return NextResponse.json({ 
-      error: 'Internal server error',
-      success: false
-    }, { status: 500 });
+  } catch (error) {
+    const elapsed = Date.now() - requestStart;
+
+    console.error(
+      '[run-analysis] Cron execution failed',
+      error instanceof Error
+        ? {
+            message: error.message,
+            stack: error.stack,
+            elapsedMs: elapsed,
+          }
+        : error
+    );
+
+    return NextResponse.json(
+      {
+        success: false,
+        error: 'Internal server error',
+        elapsedMs: elapsed,
+      },
+      { status: 500 }
+    );
   }
 }

@@ -124,10 +124,21 @@ async function runJob(
       maxAttempts: job.maxAttempts,
       retryAfter: retryAfter ?? undefined,
     });
+
+    const shouldRetry = job.attempts < job.maxAttempts;
+    if (!shouldRetry && job.type === "repository_analysis") {
+      await repositoryService.markRepositoryFailed(job.repositoryId, safeMessage);
+    }
+
     return false;
   } finally {
     if (heartbeatTimer) clearInterval(heartbeatTimer);
   }
+}
+
+export interface JobOutcome {
+  jobId: string;
+  status: "processed" | "failed";
 }
 
 export interface AnalysisWorkerSummary {
@@ -138,6 +149,8 @@ export interface AnalysisWorkerSummary {
   executionDurationMs: number;
   earlyStopReason?: string;
   success: boolean;
+  budgetExhausted?: boolean;
+  earlyStopReason?: string;
 }
 
 export async function startAnalysisWorkerLoop(opts?: {
@@ -179,6 +192,10 @@ export async function startAnalysisWorkerLoop(opts?: {
   process.on("SIGTERM", () => void shutdown("SIGTERM"));
   process.on("SIGINT", () => void shutdown("SIGINT"));
 
+  const startTime = Date.now();
+  let jobsProcessed = 0;
+  let jobsSkipped = 0;
+
   while (!stopping) {
     if (opts?.maxJobs !== undefined && (jobsProcessed + jobsFailed) >= opts.maxJobs) {
       console.log(`maxJobs limit of ${opts.maxJobs} reached, stopping loop.`);
@@ -187,6 +204,14 @@ export async function startAnalysisWorkerLoop(opts?: {
     }
 
     try {
+      if (opts?.timeBudgetMs) {
+        const elapsed = Date.now() - startTime;
+        if (elapsed >= opts.timeBudgetMs) {
+          console.log(`Time budget of ${opts.timeBudgetMs}ms reached (elapsed: ${elapsed}ms). Processed ${jobsProcessed} jobs. Shutting down gracefully...`);
+          break;
+        }
+      }
+
       const job = await analysisJobService.claimNextJob({
         workerId,
         lockMs,
@@ -210,8 +235,10 @@ export async function startAnalysisWorkerLoop(opts?: {
       
       if (isSuccess) {
         jobsProcessed++;
+        jobOutcomes.push({ jobId: job.id, status: "processed" });
       } else {
         jobsFailed++;
+        jobOutcomes.push({ jobId: job.id, status: "failed" });
       }
 
       if (opts?.once) {
@@ -229,6 +256,8 @@ export async function startAnalysisWorkerLoop(opts?: {
           executionDurationMs: Date.now() - startTimeMs,
           earlyStopReason: "errorOut",
           success: false,
+          budgetExhausted,
+          earlyStopReason,
         };
       }
       await sleep(pollIntervalMs);
