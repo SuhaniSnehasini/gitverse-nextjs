@@ -219,6 +219,13 @@ export default function RepositoryAnalysis() {
     }
   };
 
+const formattedLastAnalyzed = repository?.updatedAt
+  ? new Intl.DateTimeFormat("en-US", {
+      dateStyle: "medium",
+      timeStyle: "short",
+    }).format(new Date(repository.updatedAt))
+  : "Not available";
+  
   return (
     <DashboardLayout>
       <div className="space-y-6">
@@ -257,17 +264,23 @@ export default function RepositoryAnalysis() {
                   {repository.url}
                 </p>
                 <div className="flex items-center gap-2 mt-2 flex-wrap">
-                  <p className="text-xs text-muted-foreground">
-                    Status:{" "}
-                    <span className="capitalize">{repository.status}</span>
-                  </p>
-                  {isAnalyzing && (
-                    <span className="flex items-center gap-1 text-xs text-primary">
-                      <span className="animate-pulse">●</span>
-                      Analyzing...
-                    </span>
+                <p className="text-xs text-muted-foreground">
+                Status:{" "}
+                <span className="capitalize">{repository.status}</span>
+                </p>
+
+                <p className="text-xs text-muted-foreground">
+                  Last analyzed:{" "}
+                  <span>{formattedLastAnalyzed}</span>
+                </p>
+
+                {isAnalyzing && (
+                <span className="flex items-center gap-1 text-xs text-primary">
+                <span className="animate-pulse">●</span>
+                Analyzing...
+                </span>
                   )}
-                </div>
+              </div>
               </div>
               {/* Delete button */}
               <button
