@@ -136,6 +136,7 @@ export interface AnalysisWorkerSummary {
   jobsSkipped: number;
   jobsFailed: number;
   executionDurationMs: number;
+  earlyStopReason?: string;
   success: boolean;
 }
 
@@ -145,6 +146,7 @@ export async function startAnalysisWorkerLoop(opts?: {
   heartbeatIntervalMs?: number;
   lockMs?: number;
   once?: boolean;
+  maxJobs?: number;
 }): Promise<AnalysisWorkerSummary> {
   const workerId = opts?.workerId || getWorkerId();
   const pollIntervalMs = opts?.pollIntervalMs ?? POLL_INTERVAL_MS;
@@ -160,6 +162,7 @@ export async function startAnalysisWorkerLoop(opts?: {
   let jobsProcessed = 0;
   let jobsSkipped = 0;
   let jobsFailed = 0;
+  let earlyStopReason: string | undefined;
 
   const shutdown = async (signal: string) => {
     if (stopping) return;
@@ -177,6 +180,12 @@ export async function startAnalysisWorkerLoop(opts?: {
   process.on("SIGINT", () => void shutdown("SIGINT"));
 
   while (!stopping) {
+    if (opts?.maxJobs !== undefined && (jobsProcessed + jobsFailed) >= opts.maxJobs) {
+      console.log(`maxJobs limit of ${opts.maxJobs} reached, stopping loop.`);
+      earlyStopReason = "maxJobsReached";
+      break;
+    }
+
     try {
       const job = await analysisJobService.claimNextJob({
         workerId,
@@ -185,7 +194,10 @@ export async function startAnalysisWorkerLoop(opts?: {
 
       if (!job) {
         jobsSkipped++;
-        if (opts?.once) break;
+        if (opts?.once || opts?.maxJobs !== undefined) {
+          earlyStopReason = earlyStopReason || "queueEmpty";
+          break;
+        }
         await sleep(pollIntervalMs);
         continue;
       }
@@ -202,16 +214,20 @@ export async function startAnalysisWorkerLoop(opts?: {
         jobsFailed++;
       }
 
-      if (opts?.once) break;
+      if (opts?.once) {
+        earlyStopReason = earlyStopReason || "onceCompleted";
+        break;
+      }
     } catch (e) {
       console.error("worker loop error:", sanitizeErrorMessage(e));
-      if (opts?.once) {
+      if (opts?.once || opts?.maxJobs !== undefined) {
         return {
           totalJobsScanned,
           jobsProcessed,
           jobsSkipped,
           jobsFailed,
           executionDurationMs: Date.now() - startTimeMs,
+          earlyStopReason: "errorOut",
           success: false,
         };
       }
@@ -225,6 +241,7 @@ export async function startAnalysisWorkerLoop(opts?: {
     jobsSkipped,
     jobsFailed,
     executionDurationMs: Date.now() - startTimeMs,
+    earlyStopReason,
     success: true,
   };
 }
