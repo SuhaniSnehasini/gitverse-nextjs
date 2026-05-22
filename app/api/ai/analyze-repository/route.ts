@@ -66,9 +66,6 @@ export async function POST(request: NextRequest) {
       context,
     });
 
-<<<<<<< HEAD
-    return NextResponse.json({ analysis, type });
-=======
     const timeoutPromise = new Promise((_, reject) =>
       setTimeout(() => reject(new Error("Analysis timeout exceeded")), 25000)
     );
@@ -93,7 +90,7 @@ export async function POST(request: NextRequest) {
         success: true,
       },
     });
->>>>>>> upstream/main
+
 
   } catch (error: any) {
     const duration = Date.now() - startTime;
