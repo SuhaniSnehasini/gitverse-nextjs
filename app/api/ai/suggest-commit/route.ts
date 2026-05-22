@@ -8,6 +8,34 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { added, modified, deleted, diff } = body;
 
+    if (added !== undefined && added !== null && (!Array.isArray(added) || added.some((item: any) => typeof item !== "string"))) {
+      return NextResponse.json(
+        { error: "added must be an array of strings" },
+        { status: 400 }
+      );
+    }
+
+    if (modified !== undefined && modified !== null && (!Array.isArray(modified) || modified.some((item: any) => typeof item !== "string"))) {
+      return NextResponse.json(
+        { error: "modified must be an array of strings" },
+        { status: 400 }
+      );
+    }
+
+    if (deleted !== undefined && deleted !== null && (!Array.isArray(deleted) || deleted.some((item: any) => typeof item !== "string"))) {
+      return NextResponse.json(
+        { error: "deleted must be an array of strings" },
+        { status: 400 }
+      );
+    }
+
+    if (diff !== undefined && diff !== null && typeof diff !== "string") {
+      return NextResponse.json(
+        { error: "diff must be a string" },
+        { status: 400 }
+      );
+    }
+
     const hasValidInput =
       (Array.isArray(added) && added.length > 0) ||
       (Array.isArray(modified) && modified.length > 0) ||

@@ -311,6 +311,55 @@ async function runTests() {
     "test-token",
   );
 
+  // Test 17: Chat with conversationHistory containing null
+  await test(
+    "/api/ai/chat",
+    "POST",
+    {
+      repositoryId: 1,
+      question: "Hello",
+      conversationHistory: [null],
+    },
+    400,
+    "test-token",
+  );
+
+  // Test 18: Chat with conversationHistory containing invalid role
+  await test(
+    "/api/ai/chat",
+    "POST",
+    {
+      repositoryId: 1,
+      question: "Hello",
+      conversationHistory: [{ role: "system", content: "some instructions" }],
+    },
+    400,
+    "test-token",
+  );
+
+  // Test 19: Suggest commit with invalid added type
+  await test(
+    "/api/ai/suggest-commit",
+    "POST",
+    {
+      added: "not-an-array",
+    },
+    400,
+    "test-token",
+  );
+
+  // Test 20: Suggest commit with non-string diff
+  await test(
+    "/api/ai/suggest-commit",
+    "POST",
+    {
+      diff: 12345,
+    },
+    400,
+    "test-token",
+  );
+
+
   // Summary
   console.log("\n--- Summary ---");
   const passed = results.filter((r) => r.passed).length;

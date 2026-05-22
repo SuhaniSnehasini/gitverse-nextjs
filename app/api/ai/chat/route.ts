@@ -49,6 +49,7 @@ export async function POST(request: NextRequest) {
       (!Array.isArray(conversationHistory) ||
         conversationHistory.some(
           (m: any) =>
+            !m ||
             typeof m !== "object" ||
             !["user", "assistant"].includes(m.role) ||
             typeof m.content !== "string"
