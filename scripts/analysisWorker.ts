@@ -240,4 +240,4 @@ if (isMain) {
     console.error("worker fatal:", e);
     process.exit(1);
   });
-}
+} 
