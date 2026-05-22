@@ -10,28 +10,34 @@ export interface AuthenticatedRequest {
 export async function getAuthUser(
   request: NextRequest
 ): Promise<JWTPayload | null> {
-  const authHeader = request.headers.get("authorization");
-
-  // 1) Existing JWT auth (Authorization: Bearer ...)
-  if (authHeader && authHeader.startsWith("Bearer ")) {
-    const token = authHeader.substring(7);
-    const payload = verifyToken(token);
-    if (payload) return payload;
-  }
-
-  // 2) NextAuth session cookie (Google OAuth)
   try {
+    const authHeader = request.headers.get("authorization");
+
+    // 1) Existing JWT auth (Authorization: Bearer ...)
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+      const token = authHeader.substring(7).trim();
+      if (token) {
+        const payload = verifyToken(token);
+        if (payload && typeof payload.userId === "number" && payload.userId > 0) {
+          return payload;
+        }
+      }
+    }
+
+    // 2) NextAuth session cookie (Google OAuth)
     const token = await getToken({
       req: request,
       secret: process.env.NEXTAUTH_SECRET,
     });
+    
     if (!token?.sub || !token.email) return null;
 
     const userId = Number(token.sub);
-    if (!Number.isFinite(userId)) return null;
+    if (!Number.isFinite(userId) || userId <= 0) return null;
 
     return { userId, email: token.email };
-  } catch {
+  } catch (error) {
+    // Safely return null on any error without logging sensitive information
     return null;
   }
 }
@@ -39,7 +45,7 @@ export async function getAuthUser(
 export async function requireAuth(request: NextRequest): Promise<JWTPayload> {
   const user = await getAuthUser(request);
 
-  if (!user) {
+  if (!user || !user.userId) {
     throw new HttpError(401, "Unauthorized");
   }
 
@@ -103,3 +109,31 @@ export async function middleware(request: NextRequest) {
 export const config = {
   matcher: ["/api/:path*", "/dashboard/:path*", "/profile/:path*"],
 };
+
+export function badRequestResponse(message = "Bad request") {
+  return new NextResponse(JSON.stringify({ error: message }), {
+    status: 400,
+    headers: { "Content-Type": "application/json" },
+  });
+}
+
+export function unauthorizedResponse(message = "Authentication required") {
+  return new NextResponse(JSON.stringify({ error: message }), {
+    status: 401,
+    headers: { "Content-Type": "application/json" },
+  });
+}
+
+export function forbiddenResponse(message = "You do not have access to this resource") {
+  return new NextResponse(JSON.stringify({ error: message }), {
+    status: 403,
+    headers: { "Content-Type": "application/json" },
+  });
+}
+
+export function notFoundResponse(message = "Resource not found") {
+  return new NextResponse(JSON.stringify({ error: message }), {
+    status: 404,
+    headers: { "Content-Type": "application/json" },
+  });
+}

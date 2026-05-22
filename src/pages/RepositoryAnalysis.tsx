@@ -237,7 +237,8 @@ export default function RepositoryAnalysis() {
     }
   };
 
-  // ── Delete ────────────────────────────────────────────────────────
+  // ---------------- Delete ----------------
+  //  Delete 
   const handleDeleteRepository = async () => {
     if (!id) return;
     setIsDeleting(true);
@@ -264,7 +265,8 @@ export default function RepositoryAnalysis() {
     }
   };
 
-  // ── Tab content ───────────────────────────────────────────────────
+  // â”€â”€ Tab content â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // Tab content
   const renderContent = () => {
     switch (activeTab) {
       case "overview":     return <RepositoryOverview repositoryData={repository} />;
@@ -277,7 +279,8 @@ export default function RepositoryAnalysis() {
     }
   };
 
-  // ── Helpers ───────────────────────────────────────────────────────
+  // â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // Helpers
   const formatElapsed = (secs: number) => {
     if (secs < 60) return `${secs}s`;
     return `${Math.floor(secs / 60)}m ${secs % 60}s`;
@@ -286,7 +289,8 @@ export default function RepositoryAnalysis() {
   const progressPercent = job?.progressPercent ?? 0;
   const progressMessage = job?.progressMessage || "Queued";
 
-  // ── Render ────────────────────────────────────────────────────────
+  // â”€â”€ Render â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // Render
   return (
     <DashboardLayout>
       <div className="space-y-6">
@@ -323,7 +327,7 @@ export default function RepositoryAnalysis() {
                   </p>
                   {isAnalyzing && !analysisTimedOut && (
                     <span className="flex items-center gap-1 text-xs text-primary">
-                      <span className="animate-pulse">◉</span>
+                      <span className="animate-pulse">*</span>
                       Analyzing...
                     </span>
                   )}
@@ -338,7 +342,8 @@ export default function RepositoryAnalysis() {
               </button>
             </div>
 
-            {/* ── Analyzing spinner (with timeout awareness) ── */}
+            {/* â”€â”€ Analyzing spinner (with timeout awareness) â”€â”€ */}
+            {/* Analyzing spinner (with timeout awareness) */}
             {isAnalyzing && !analysisTimedOut ? (
               <div className="glass rounded-lg p-12 text-center space-y-6">
                 <div className="flex justify-center">
@@ -377,8 +382,8 @@ export default function RepositoryAnalysis() {
                     <div className="mt-4 max-w-sm mx-auto p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
                       <p className="text-xs text-yellow-400 flex items-start gap-2">
                         <AlertCircle className="h-3 w-3 mt-0.5 flex-shrink-0" />
-                        Still queued after {formatElapsed(elapsedSeconds)}. 
-                        The worker runs every 5 minutes via GitHub Actions — 
+                        Still queued after {formatElapsed(elapsedSeconds)}.
+                        The worker runs every 5 minutes via GitHub Actions - 
                         it should pick this up shortly.
                       </p>
                     </div>
@@ -398,7 +403,8 @@ export default function RepositoryAnalysis() {
               </div>
 
             ) : analysisTimedOut || analysisError ? (
-              /* ── Timeout / error state ── */
+              /* â”€â”€ Timeout / error state â”€â”€ */
+              /* Timeout / error state */
               <div className="glass rounded-lg p-12 text-center space-y-6">
                 <div className="flex justify-center">
                   <div className="p-4 rounded-full bg-red-500/10">
@@ -439,7 +445,8 @@ export default function RepositoryAnalysis() {
               </div>
 
             ) : (
-              /* ── Done — show tabs ── */
+              /* â”€â”€ Done â€” show tabs â”€â”€ */
+              /* Done - show tabs */
               <>
                 <div className="glass rounded-lg p-2">
                   <div className="flex gap-2 overflow-x-auto">

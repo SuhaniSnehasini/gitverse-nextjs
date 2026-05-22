@@ -24,7 +24,6 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeRaw from "rehype-raw";
 import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
-import { EmptyState } from "@/components/ui/EmptyState";
 
 interface RepositoryData {
   id: string;
