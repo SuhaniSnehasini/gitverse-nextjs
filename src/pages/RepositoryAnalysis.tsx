@@ -58,9 +58,17 @@ const tabs: Tab[] = [
   { id: "overview", label: "Overview", icon: <Home className="h-4 w-4" /> },
   { id: "files", label: "Files", icon: <FolderTree className="h-4 w-4" /> },
   { id: "commits", label: "Commits", icon: <GitCommit className="h-4 w-4" /> },
-  { id: "contributors", label: "Contributors", icon: <Users className="h-4 w-4" /> },
+  {
+    id: "contributors",
+    label: "Contributors",
+    icon: <Users className="h-4 w-4" />,
+  },
   { id: "mentor", label: "AI Mentor", icon: <Sparkles className="h-4 w-4" /> },
-  { id: "insights", label: "Insights", icon: <BarChart3 className="h-4 w-4" /> },
+  {
+    id: "insights",
+    label: "Insights",
+    icon: <BarChart3 className="h-4 w-4" />,
+  },
 ];
 
 export default function RepositoryAnalysis() {
@@ -83,7 +91,7 @@ export default function RepositoryAnalysis() {
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
 
   const pollingStartedAt = useRef<number | null>(null);
-  // Tracks last time progress changed � prevents falsely timing out active jobs
+  // Tracks last time progress changed � prevents falsely timing out active jobs
   const lastProgressAt = useRef<number | null>(null);
   const elapsedTimer = useRef<NodeJS.Timeout | null>(null);
 
@@ -93,7 +101,7 @@ export default function RepositoryAnalysis() {
       elapsedTimer.current = setInterval(() => {
         if (pollingStartedAt.current) {
           setElapsedSeconds(
-            Math.floor((Date.now() - pollingStartedAt.current) / 1000)
+            Math.floor((Date.now() - pollingStartedAt.current) / 1000),
           );
         }
       }, 1000);
@@ -152,8 +160,8 @@ export default function RepositoryAnalysis() {
         setIsAnalyzing(false);
         setAnalysisError(
           "Analysis has been queued for over 8 minutes without progress. " +
-          "The background worker may not be running. Please try again later " +
-          "or contact the maintainer."
+            "The background worker may not be running. Please try again later " +
+            "or contact the maintainer.",
         );
         return;
       }
@@ -162,7 +170,10 @@ export default function RepositoryAnalysis() {
       if (stopped) return;
 
       setTimeout(poll, intervalMs);
-      intervalMs = Math.min(POLL_INTERVAL_MAX_MS, intervalMs + POLL_INTERVAL_STEP_MS);
+      intervalMs = Math.min(
+        POLL_INTERVAL_MAX_MS,
+        intervalMs + POLL_INTERVAL_STEP_MS,
+      );
     };
 
     poll();
@@ -170,8 +181,14 @@ export default function RepositoryAnalysis() {
     return () => {
       stopped = true;
     };
-  // analysisTimedOut included so Check Again restarts polling
-  }, [repository?.status, repository?.latestJob?.id, job?.id, job?.status, analysisTimedOut]);
+    // analysisTimedOut included so Check Again restarts polling
+  }, [
+    repository?.status,
+    repository?.latestJob?.id,
+    job?.id,
+    job?.status,
+    analysisTimedOut,
+  ]);
 
   // ── Data fetchers ─────────────────────────────────────────────────
   const fetchRepository = async () => {
@@ -199,14 +216,14 @@ export default function RepositoryAnalysis() {
       const token = localStorage.getItem("gitverse_token");
       const response = await axios.get(
         buildApiUrl(`/api/analysis-jobs/${jobId}`),
-        { headers: { Authorization: `Bearer ${token}` } }
+        { headers: { Authorization: `Bearer ${token}` } },
       );
 
       const nextJob = response.data.job || response.data;
       // Use functional setJob so we always compare against the latest job
       // state, avoiding the stale-closure bug where the polling loop holds
       // an old snapshot of job and never sees progress-only updates.
-      setJob((prevJob) => {
+      setJob((prevJob: any) => {
         const prevPercent = prevJob?.progressPercent ?? null;
         const prevMessage = prevJob?.progressMessage ?? null;
         const nextPercent = nextJob?.progressPercent ?? null;
@@ -255,7 +272,8 @@ export default function RepositoryAnalysis() {
       console.error("Error deleting repository:", error);
       toast({
         title: "Error",
-        description: error.response?.data?.error || "Failed to delete repository",
+        description:
+          error.response?.data?.error || "Failed to delete repository",
         variant: "destructive",
       });
     } finally {
@@ -267,13 +285,20 @@ export default function RepositoryAnalysis() {
   // ── Tab content ───────────────────────────────────────────────────
   const renderContent = () => {
     switch (activeTab) {
-      case "overview":     return <RepositoryOverview repositoryData={repository} />;
-      case "files":        return <FileStructure repository={repository} />;
-      case "commits":      return <CommitHistory repository={repository} />;
-      case "contributors": return <Contributors repository={repository} />;
-      case "mentor":       return <RepositoryMentorTab repositoryData={repository} />;
-      case "insights":     return <RepositoryInsights repository={repository} />;
-      default:             return <RepositoryOverview />;
+      case "overview":
+        return <RepositoryOverview repositoryData={repository} />;
+      case "files":
+        return <FileStructure repository={repository} />;
+      case "commits":
+        return <CommitHistory repository={repository} />;
+      case "contributors":
+        return <Contributors repository={repository} />;
+      case "mentor":
+        return <RepositoryMentorTab repositoryData={repository} />;
+      case "insights":
+        return <RepositoryInsights repository={repository} />;
+      default:
+        return <RepositoryOverview />;
     }
   };
 
@@ -319,7 +344,8 @@ export default function RepositoryAnalysis() {
                 </p>
                 <div className="flex items-center gap-2 mt-2 flex-wrap">
                   <p className="text-xs text-muted-foreground">
-                    Status: <span className="capitalize">{repository.status}</span>
+                    Status:{" "}
+                    <span className="capitalize">{repository.status}</span>
                   </p>
                   {isAnalyzing && !analysisTimedOut && (
                     <span className="flex items-center gap-1 text-xs text-primary">
@@ -345,9 +371,12 @@ export default function RepositoryAnalysis() {
                   <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-primary" />
                 </div>
                 <div>
-                  <h2 className="text-xl font-semibold mb-2">Analyzing Repository</h2>
+                  <h2 className="text-xl font-semibold mb-2">
+                    Analyzing Repository
+                  </h2>
                   <p className="text-muted-foreground">
-                    We&apos;re analyzing structure, commits, contributors, and more.
+                    We&apos;re analyzing structure, commits, contributors, and
+                    more.
                   </p>
 
                   {/* Progress bar */}
@@ -377,9 +406,9 @@ export default function RepositoryAnalysis() {
                     <div className="mt-4 max-w-sm mx-auto p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
                       <p className="text-xs text-yellow-400 flex items-start gap-2">
                         <AlertCircle className="h-3 w-3 mt-0.5 flex-shrink-0" />
-                        Still queued after {formatElapsed(elapsedSeconds)}. 
-                        The worker runs every 5 minutes via GitHub Actions — 
-                        it should pick this up shortly.
+                        Still queued after {formatElapsed(elapsedSeconds)}. The
+                        worker runs every 5 minutes via GitHub Actions — it
+                        should pick this up shortly.
                       </p>
                     </div>
                   )}
@@ -396,7 +425,6 @@ export default function RepositoryAnalysis() {
                   </div>
                 </div>
               </div>
-
             ) : analysisTimedOut || analysisError ? (
               /* ── Timeout / error state ── */
               <div className="glass rounded-lg p-12 text-center space-y-6">
@@ -407,7 +435,9 @@ export default function RepositoryAnalysis() {
                 </div>
                 <div>
                   <h2 className="text-xl font-semibold mb-2 text-red-400">
-                    {analysisTimedOut ? "Analysis Timed Out" : "Analysis Failed"}
+                    {analysisTimedOut
+                      ? "Analysis Timed Out"
+                      : "Analysis Failed"}
                   </h2>
                   <p className="text-muted-foreground max-w-md mx-auto text-sm">
                     {analysisError}
@@ -437,7 +467,6 @@ export default function RepositoryAnalysis() {
                   </button>
                 </div>
               </div>
-
             ) : (
               /* ── Done — show tabs ── */
               <>
@@ -483,12 +512,15 @@ export default function RepositoryAnalysis() {
                   <Trash2 className="h-5 w-5 sm:h-6 sm:w-6 text-red-500" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <h3 className="text-lg sm:text-xl font-bold mb-2">Delete Repository</h3>
+                  <h3 className="text-lg sm:text-xl font-bold mb-2">
+                    Delete Repository
+                  </h3>
                   <p className="text-xs sm:text-sm text-muted-foreground">
                     Are you sure you want to delete{" "}
                     <strong className="break-words">{repository?.name}</strong>?
                     This action cannot be undone and will permanently remove all
-                    repository data, including commits, contributors, and analysis results.
+                    repository data, including commits, contributors, and
+                    analysis results.
                   </p>
                 </div>
               </div>
