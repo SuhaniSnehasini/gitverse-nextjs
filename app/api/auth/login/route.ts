@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { checkRateLimit } from "@/utils/rateLimit";
 import { checkRateLimit } from '@/utils/rateLimit';
 import bcrypt from "bcryptjs";
 import prisma from "@/lib/prisma";
@@ -105,7 +106,7 @@ export async function POST(request: NextRequest) {
       token,
     });
   } catch (error) {
-    console.error("Login error:", error);
+    console.error("Login error:", error instanceof Error ? error.message : "Unknown error");
     return NextResponse.json(
       { error: "An unexpected error occurred" },
       { status: 500 }
