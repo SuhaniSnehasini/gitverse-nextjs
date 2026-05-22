@@ -11,38 +11,29 @@ function secureCompare(a: string | null, b: string | null): boolean {
 }
 
 export async function GET(request: Request) {
-  const isDevelopment = process.env.NODE_ENV === 'development';
-  const expectedSecret = process.env.ANALYSIS_RUNNER_SECRET;
-
-  if (!expectedSecret && !isDevelopment) {
-    console.error('CRITICAL: ANALYSIS_RUNNER_SECRET is missing in production environment');
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
-  }
-
+  // Simple auth check for internal cron
   const authHeader = request.headers.get('authorization');
-  const expectedBearer = expectedSecret ? `Bearer ${expectedSecret}` : null;
-  
-  const isAuthorized = isDevelopment && !expectedSecret
-    ? true // Allow bypass in local dev if no secret is set
-    : secureCompare(authHeader, expectedBearer);
-
-  if (!isAuthorized) {
-    console.warn('Unauthorized access attempt to internal analysis runner denied');
+  if (
+    process.env.ANALYSIS_RUNNER_SECRET &&
+    authHeader !== `Bearer ${process.env.ANALYSIS_RUNNER_SECRET}`
+  ) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  if (Number.isNaN(timeBudgetMs) || timeBudgetMs < 10_000) {
-    return NextResponse.json(
-      { error: 'timeBudgetMs must be at least 10000ms' },
-      { status: 400 },
-    );
-  }
+  const url = new URL(request.url);
+  const maxJobsParam = url.searchParams.get('maxJobs');
+  const parsedMaxJobs = maxJobsParam ? parseInt(maxJobsParam, 10) : undefined;
+  const maxJobs = parsedMaxJobs != null && !isNaN(parsedMaxJobs) && parsedMaxJobs > 0 
+    ? parsedMaxJobs 
+    : undefined;
 
-  console.log(`Starting analysis cron run (budget: ${timeBudgetMs}ms)...`);
+  console.log(`Starting analysis cron run... (maxJobs: ${maxJobs ?? 'default'})`);
 
   try {
-    const metrics = await startAnalysisWorkerLoop({
-      timeBudgetMs,
+    // Run the worker loop with maxJobs if provided, otherwise "once" mode
+    const metrics = await startAnalysisWorkerLoop({ 
+      once: maxJobs === undefined,
+      maxJobs
     });
 
     console.log(`Finished analysis cron run. Summary:`, metrics);
