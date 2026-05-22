@@ -302,7 +302,6 @@ export default function RepositoryAnalysis() {
     }
   };
 
-  // â”€â”€ Delete â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const handleDeleteRepository = async () => {
     if (!id) return;
     setIsDeleting(true);
@@ -330,7 +329,7 @@ export default function RepositoryAnalysis() {
     }
   };
 
-  // â”€â”€ Tab content â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  
   const renderContent = () => {
     switch (activeTab) {
       case "overview":
@@ -349,6 +348,7 @@ export default function RepositoryAnalysis() {
         return <RepositoryOverview repositoryData={repository} />;
     }
   };
+
 const lastAnalyzedDate = repository?.lastAnalyzedAt
   ? new Date(repository.lastAnalyzedAt)
   : null;
@@ -360,7 +360,16 @@ const formattedLastAnalyzed =
         timeStyle: "short",
       }).format(lastAnalyzedDate)
     : "Not available";
-  return (
+
+const formatElapsed = (secs: number) => {
+  if (secs < 60) return `${secs}s`;
+  return `${Math.floor(secs / 60)}m ${secs % 60}s`;
+};
+
+const progressPercent = job?.progressPercent ?? 0;
+const progressMessage = job?.progressMessage || "Queued";
+
+return (
     <DashboardLayout>
       <div className="space-y-6">
         {showDeleteDialog && (
