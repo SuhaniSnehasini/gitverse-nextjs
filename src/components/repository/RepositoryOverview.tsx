@@ -13,13 +13,16 @@ import {
   TrendingUp,
   ExternalLink,
 } from "lucide-react";
+
 import {
   Card,
   CardHeader,
   CardTitle,
   CardDescription,
   CardContent,
+  EmptyState,
 } from "@/components/ui";
+
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeRaw from "rehype-raw";
@@ -192,7 +195,7 @@ export const RepositoryOverview = ({
     // while preventing XSS, protocol-based exploits, and DOM clobbering.
     const schema: any = {
       ...(defaultSchema as any),
-      
+
       // Note: "img" is already in defaultSchema.tagNames, so we don't need to add it manually.
 
       // Explicitly restrict protocols for attributes to mitigate protocol-based XSS (e.g., javascript:)
@@ -218,7 +221,6 @@ export const RepositoryOverview = ({
 
     return schema;
   })();
-
 
   const formatTimeAgo = (timestamp: string) => {
     const date = new Date(timestamp);

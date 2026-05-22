@@ -3,7 +3,6 @@ import { isHttpError, requireAuth } from "@/lib/api-auth";
 import { repositoryService } from "@/lib/services/repositoryService";
 import { analysisJobService } from "@/lib/services/analysisJobService";
 import { getRepositories } from "@/lib/services/repositoryService";
-import type { PaginatedResponse } from "@/types/pagination";
 
 export async function POST(request: NextRequest) {
   try {

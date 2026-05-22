@@ -176,6 +176,10 @@ export async function startAnalysisWorkerLoop(opts?: {
   let jobsSkipped = 0;
   let jobsFailed = 0;
   const jobOutcomes: JobOutcome[] = [];
+  const timeBudgetMs = opts?.timeBudgetMs;
+  const budgetGraceMs = 5000; // 5 seconds grace
+  let budgetExhausted = false;
+  let earlyStopReason: string | undefined;
 
   const shutdown = async (signal: string) => {
     if (stopping) return;
@@ -192,10 +196,6 @@ export async function startAnalysisWorkerLoop(opts?: {
   process.on("SIGTERM", () => void shutdown("SIGTERM"));
   process.on("SIGINT", () => void shutdown("SIGINT"));
 
-  const startTime = Date.now();
-  let jobsProcessed = 0;
-  let jobsSkipped = 0;
-
   while (!stopping) {
     if (timeBudgetMs) {
       const elapsed = Date.now() - startTimeMs;
@@ -210,7 +210,7 @@ export async function startAnalysisWorkerLoop(opts?: {
 
     try {
       if (opts?.timeBudgetMs) {
-        const elapsed = Date.now() - startTime;
+        const elapsed = Date.now() - startTimeMs;
         if (elapsed >= opts.timeBudgetMs) {
           console.log(`Time budget of ${opts.timeBudgetMs}ms reached (elapsed: ${elapsed}ms). Processed ${jobsProcessed} jobs. Shutting down gracefully...`);
           break;

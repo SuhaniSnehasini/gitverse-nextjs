@@ -33,6 +33,7 @@ export function useRepositories({ limit = DEFAULT_LIMIT } = {}): UseRepositories
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
+  const isLoadingMoreRef = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -80,7 +81,7 @@ export function useRepositories({ limit = DEFAULT_LIMIT } = {}): UseRepositories
       .then((json) => {
         setRepos((prev) => {
           const seen = new Set(prev.map((r) => r.id));
-          const fresh = json.data.filter((r) => !seen.has(r.id));
+          const fresh = json.data.filter((r: Repository) => !seen.has(r.id));
           return [...prev, ...fresh];
         });
         setCursor(json.nextCursor);
