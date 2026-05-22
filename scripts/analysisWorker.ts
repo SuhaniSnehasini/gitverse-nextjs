@@ -130,12 +130,18 @@ async function runJob(
   }
 }
 
+export interface JobOutcome {
+  jobId: string;
+  status: "processed" | "failed";
+}
+
 export interface AnalysisWorkerSummary {
   totalJobsScanned: number;
   jobsProcessed: number;
   jobsSkipped: number;
   jobsFailed: number;
   executionDurationMs: number;
+  jobOutcomes?: JobOutcome[];
   success: boolean;
 }
 
@@ -160,6 +166,7 @@ export async function startAnalysisWorkerLoop(opts?: {
   let jobsProcessed = 0;
   let jobsSkipped = 0;
   let jobsFailed = 0;
+  const jobOutcomes: JobOutcome[] = [];
 
   const shutdown = async (signal: string) => {
     if (stopping) return;
@@ -198,8 +205,10 @@ export async function startAnalysisWorkerLoop(opts?: {
       
       if (isSuccess) {
         jobsProcessed++;
+        jobOutcomes.push({ jobId: job.id, status: "processed" });
       } else {
         jobsFailed++;
+        jobOutcomes.push({ jobId: job.id, status: "failed" });
       }
 
       if (opts?.once) break;
@@ -212,6 +221,7 @@ export async function startAnalysisWorkerLoop(opts?: {
           jobsSkipped,
           jobsFailed,
           executionDurationMs: Date.now() - startTimeMs,
+          jobOutcomes,
           success: false,
         };
       }
@@ -225,7 +235,8 @@ export async function startAnalysisWorkerLoop(opts?: {
     jobsSkipped,
     jobsFailed,
     executionDurationMs: Date.now() - startTimeMs,
-    success: true,
+    jobOutcomes,
+    success: jobsFailed === 0,
   };
 }
 
