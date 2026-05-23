@@ -31,6 +31,7 @@ export default function LandingPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [scoreAnimate, setScoreAnimate] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
+  const isAnalyzeDisabled = !repoUrl.trim() || isLoading;
 
   const mentorMessages = useMemo(
     () => [
@@ -156,6 +157,7 @@ export default function LandingPage() {
 
   const handleAnalyze = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!repoUrl.trim() || isLoading) return;
 
     // Demo-only CTA: keep it as UI (no navigation / no analysis).
     setIsLoading(true);
@@ -415,8 +417,8 @@ export default function LandingPage() {
                   <Button
                     type="submit"
                     size="lg"
-                    disabled={isLoading}
-                    className="group h-12 px-6 bg-gradient-primary hover:opacity-90 transition-opacity font-semibold transition-transform hover:scale-[1.01] active:scale-[0.99]"
+                    disabled={isAnalyzeDisabled}
+                    className="group h-12 px-6 bg-gradient-primary font-semibold transition-all hover:opacity-90 hover:scale-[1.01] active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:scale-100"
                   >
                     {isLoading ? (
                       <>
