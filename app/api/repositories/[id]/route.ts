@@ -3,6 +3,9 @@ import { isHttpError, requireAuth } from "@/lib/middleware";
 import prisma from "@/lib/prisma";
 import { repositoryService } from "@/lib/services/repositoryService";
 
+const getErrorMessage = (error: unknown, fallback: string) =>
+  error instanceof Error ? error.message : fallback;
+
 export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }
@@ -48,12 +51,12 @@ export async function GET(
     });
 
     return NextResponse.json({ repository, latestJob });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Get repository error:", error);
 
     if (isHttpError(error)) {
       return NextResponse.json(
-        { error: error.message },
+        { error: getErrorMessage(error, "Request failed") },
         { status: error.status }
       );
     }
@@ -83,18 +86,20 @@ export async function DELETE(
     await repositoryService.deleteRepository(id, user.userId);
 
     return NextResponse.json({ message: "Repository deleted successfully" });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Delete repository error:", error);
 
     if (isHttpError(error)) {
       return NextResponse.json(
-        { error: error.message },
+        { error: getErrorMessage(error, "Request failed") },
         { status: error.status }
       );
     }
 
-    if (error?.message === "Repository not found") {
-      return NextResponse.json({ error: error.message }, { status: 404 });
+    const errorMessage = getErrorMessage(error, "");
+
+    if (errorMessage === "Repository not found") {
+      return NextResponse.json({ error: errorMessage }, { status: 404 });
     }
 
     return NextResponse.json(
