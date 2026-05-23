@@ -72,7 +72,65 @@ class AnalysisProgressTracker {
   }
 }
 
+const IGNORED_FILE_TREE_DIRS = new Set([
+  "node_modules",
+  ".next",
+  ".nuxt",
+  "dist",
+  "build",
+  "out",
+  ".git",
+  "coverage",
+  ".turbo",
+  ".cache",
+  "__pycache__",
+  ".pytest_cache",
+  "venv",
+  ".venv",
+  "vendor",
+  "target",
+  ".gradle",
+  ".mvn",
+]);
+
 export class RepositoryService {
+  private async getDefaultBranchFromGitHub(url: string): Promise<string | null> {
+    const githubMatch = url.match(
+      /github\.com[/:]([^/]+)\/([^/.\s]+?)(?:\.git)?(?:[/?#].*)?$/i,
+    );
+    if (!githubMatch) return null;
+
+    const [, owner, repo] = githubMatch;
+    const headers: Record<string, string> = {
+      Accept: "application/vnd.github+json",
+      "X-GitHub-Api-Version": "2022-11-28",
+    };
+    if (process.env.GITHUB_TOKEN) {
+      headers.Authorization = `Bearer ${process.env.GITHUB_TOKEN}`;
+    }
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+    try {
+      const res = await fetch(`https://api.github.com/repos/${owner}/${repo}`, {
+        headers,
+        signal: controller.signal,
+      });
+      if (!res.ok) return null;
+
+      const data = await res.json();
+      return typeof data.default_branch === "string"
+        ? data.default_branch
+        : null;
+    } catch (err) {
+      console.warn("[defaultBranch] GitHub API failed, using git detection:", err);
+      return null;
+    } finally {
+      clearTimeout(timeoutId);
+    }
+  }
+
   private async tryReadmeFromRepoPath(repoPath: string): Promise<{
     path: string;
     text: string;
@@ -254,7 +312,10 @@ export class RepositoryService {
       // Analyze branches
       await tracker.update(15, "Analyzing branches");
       const branches = await gitService.getBranches();
-      const defaultBranch = branches.find((b) => b.isDefault)?.name || "main";
+      const defaultBranch =
+        (await this.getDefaultBranchFromGitHub(repository.url)) ||
+        branches.find((b) => b.isDefault)?.name ||
+        "main";
 
       await prisma.branch.createMany({
         data: branches.map((branch) => ({
@@ -366,7 +427,15 @@ export class RepositoryService {
 
       // Analyze files
       await tracker.update(65, "Scanning files");
-      const files = await gitService.getFileTree();
+      const allFiles = await gitService.getFileTree();
+      const files = allFiles.filter((file) => {
+        const parts = file.path.split(/[\\/]/);
+        return !parts.some((part) => IGNORED_FILE_TREE_DIRS.has(part));
+      });
+
+      console.log(
+        `File scan: ${allFiles.length} total, ${files.length} after ignoring build/generated folders`,
+      );
 
       // Avoid querying existing file paths (can be huge). Just rely on
       // `skipDuplicates` with the unique constraint (repositoryId, path).
