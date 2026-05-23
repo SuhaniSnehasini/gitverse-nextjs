@@ -59,7 +59,7 @@ export async function GET(
       { repository, latestJob },
       { status: 200, headers: securityHeaders }
     );
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Get repository error:", error);
 
     if (isHttpError(error)) {
@@ -98,7 +98,7 @@ export async function DELETE(
       { message: "Repository deleted successfully" },
       { status: 200, headers: securityHeaders }
     );
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Delete repository error:", error);
 
     if (isHttpError(error)) {
@@ -108,9 +108,11 @@ export async function DELETE(
       );
     }
 
-    if (error.message === "Repository not found") {
+    const errorMessage = error instanceof Error ? error.message : "";
+
+    if (errorMessage === "Repository not found") {
       return NextResponse.json(
-        { error: error.message },
+        { error: errorMessage },
         { status: 404, headers: securityHeaders }
       );
     }
