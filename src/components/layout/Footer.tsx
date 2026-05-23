@@ -117,7 +117,7 @@ export const Footer: React.FC = () => {
               <Twitter size={20} />
             </a>
             <a
-              href="https://github.com"
+              href="https://github.com/nisshchayarathi/gitverse-nextjs"
               target="_blank"
               rel="noopener noreferrer"
               className="hover:text-primary transition-colors"
