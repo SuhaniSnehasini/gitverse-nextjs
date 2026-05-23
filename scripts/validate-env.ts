@@ -1,117 +1,226 @@
-import * as fs from "fs";
-import * as path from "path";
-import * as dotenv from "dotenv";
+import dotenv from "dotenv";
+import fs from "node:fs";
+import path from "node:path";
 
-// Colors for beautiful console output
-const COLORS = {
-  reset: "\x1b[0m",
-  green: "\x1b[32m",
-  red: "\x1b[31m",
-  yellow: "\x1b[33m",
-  cyan: "\x1b[36m",
-  bold: "\x1b[1m",
-};
-
-interface EnvRule {
+type ValidationResult = {
   key: string;
   required: boolean;
-  validate?: (value: string) => { isValid: boolean; message: string };
-  warning?: boolean;
+  isValid: boolean;
+  message: string;
+};
+
+const envFileCandidates = [".env.local", ".env"];
+
+function loadEnvironmentFile() {
+  for (const candidate of envFileCandidates) {
+    const filePath = path.resolve(process.cwd(), candidate);
+
+    if (fs.existsSync(filePath)) {
+      dotenv.config({ path: filePath, override: false });
+      return filePath;
+    }
+  }
+
+  return null;
 }
 
-const envRules: EnvRule[] = [
-  {
-    key: "DATABASE_URL",
+function isPlaceholder(value: string) {
+  const normalized = value.trim().toLowerCase();
+
+  return (
+    normalized === "your-secret-here" ||
+    normalized === "replace-me" ||
+    normalized === "change-me" ||
+    normalized === "example" ||
+    normalized.includes("your-") ||
+    normalized.includes("placeholder")
+  );
+}
+
+function isAbsoluteUrl(value: string) {
+  try {
+    const parsed = new URL(value.trim());
+    return parsed.protocol === "http:" || parsed.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
+function colorize(text: string, code: number) {
+  return `\u001b[${code}m${text}\u001b[0m`;
+}
+
+function validateRequiredValue(
+  key: string,
+  value: string | undefined,
+  validate: (trimmedValue: string) => { isValid: boolean; message: string },
+): ValidationResult {
+  const trimmedValue = value?.trim() ?? "";
+
+  if (!trimmedValue) {
+    return {
+      key,
+      required: true,
+      isValid: false,
+      message: "Missing required value",
+    };
+  }
+
+  const result = validate(trimmedValue);
+
+  return {
+    key,
     required: true,
-    validate: (val) => {
-      const isPg = val.startsWith("postgresql://") || val.startsWith("postgres://");
-      return {
-        isValid: isPg,
-        message: "Must be a valid PostgreSQL connection string starting with postgresql:// or postgres://",
-      };
-    },
-  },
-  {
-    key: "JWT_SECRET",
-    required: true,
-    validate: (val) => {
-      return {
-        isValid: val.length >= 8,
-        message: "Should be at least 8 characters long for adequate security",
-      };
-    },
-  },
-  {
-    key: "GEMINI_API_KEY",
-    required: true,
-    validate: (val) => {
-      return {
-        isValid: val.trim().length > 0 && val !== "your_gemini_api_key_here",
-        message: "Must be a valid non-placeholder Google Gemini API key",
-      };
-    },
-  },
-  {
-    key: "NEXTAUTH_SECRET",
-    required: true,
-    validate: (val) => {
-      return {
-        isValid: val.trim().length > 0 && val !== "your-nextauth-secret",
-        message: "Must be a valid non-placeholder NextAuth secret",
-      };
-    },
-  },
-  {
-    key: "NEXTAUTH_URL",
-    required: true,
-    validate: (val) => {
-      try {
-        new URL(val);
-        return { isValid: true, message: "" };
-      } catch {
-        return { isValid: false, message: "Must be a valid absolute URL (e.g. http://localhost:3000)" };
-      }
-    },
-  },
-  {
-    key: "GITHUB_APP_ID",
+    isValid: result.isValid,
+    message: result.message,
+  };
+}
+
+function validateOptionalValue(
+  key: string,
+  value: string | undefined,
+  validate: (trimmedValue: string) => { isValid: boolean; message: string },
+): ValidationResult | null {
+  const trimmedValue = value?.trim() ?? "";
+
+  if (!trimmedValue) {
+    return null;
+  }
+
+  const result = validate(trimmedValue);
+
+  return {
+    key,
     required: false,
-    warning: true,
-  },
-  {
-    key: "GITHUB_APP_PRIVATE_KEY",
-    required: false,
-    warning: true,
-  },
-];
+    isValid: result.isValid,
+    message: result.message,
+  };
+}
+import dotenv from "dotenv";
+import fs from "node:fs";
+import path from "node:path";
 
-function runValidation() {
-  console.log(`${COLORS.bold}${COLORS.cyan}=========================================`);
-  console.log("🛠️  GitVerse Next.js Env Configuration Validator");
-  console.log(`=========================================${COLORS.reset}\n`);
+type ValidationResult = {
+  key: string;
+  required: boolean;
+  isValid: boolean;
+  message: string;
+};
 
-  const rootDir = process.cwd();
-  const envLocalPath = path.join(rootDir, ".env.local");
-  const envPath = path.join(rootDir, ".env");
+const envFileCandidates = [".env.local", ".env"];
 
-  let loadedPath = "";
+function loadEnvironmentFile() {
+  for (const candidate of envFileCandidates) {
+    const filePath = path.resolve(process.cwd(), candidate);
 
-  if (fs.existsSync(envLocalPath)) {
-    dotenv.config({ path: envLocalPath });
-    loadedPath = ".env.local";
-  } else if (fs.existsSync(envPath)) {
-    dotenv.config({ path: envPath });
-    loadedPath = ".env";
-  } else {
-    console.error(
-      `${COLORS.red}❌ Error: No environment configuration file found!${COLORS.reset}`
-    );
-    console.error(
-      `Please copy ${COLORS.cyan}.env.example${COLORS.reset} to ${COLORS.cyan}.env.local${COLORS.reset} and fill in your values.\n`
+    if (fs.existsSync(filePath)) {
+      dotenv.config({ path: filePath, override: false });
+      return filePath;
+    }
+  }
+
+  return null;
+}
+
+function isPlaceholder(value: string) {
+  const normalized = value.trim().toLowerCase();
+
+  return (
+    normalized === "your-secret-here" ||
+    normalized === "replace-me" ||
+    normalized === "change-me" ||
+    normalized === "example" ||
+    normalized.includes("your-") ||
+    normalized.includes("placeholder")
+  );
+}
+
+function isAbsoluteUrl(value: string) {
+  try {
+  console.error(
+      colorize(`\nEnvironment validation failed with ${failures.length} issue(s).`, 31),
     );
     process.exit(1);
   }
 
+  console.log(colorize("\nEnvironment validation passed.", 32));
+}
+
+runValidation();
+    validateRequiredValue("JWT_SECRET", process.env.JWT_SECRET, (value) => {
+      const isValid = Buffer.byteLength(value, "utf8") >= 32 && !isPlaceholder(value);
+
+      return {
+        isValid,
+        message: isValid
+          ? "Meets the 32-byte minimum"
+          : "Should be at least 32 bytes/characters for adequate security",
+      };
+    }),
+    validateRequiredValue("GEMINI_API_KEY", process.env.GEMINI_API_KEY, (value) => {
+      const isValid = !isPlaceholder(value);
+
+      return {
+        isValid,
+        message: isValid ? "Configured" : "Must not be a placeholder value",
+      };
+    }),
+    validateRequiredValue("NEXTAUTH_SECRET", process.env.NEXTAUTH_SECRET, (value) => {
+      const isValid = Buffer.byteLength(value, "utf8") >= 32 && !isPlaceholder(value);
+
+      return {
+        isValid,
+        message: isValid
+          ? "Meets the 32-byte minimum"
+          : "Should be non-placeholder and at least 32 bytes/characters",
+      };
+    }),
+    validateRequiredValue("NEXTAUTH_URL", process.env.NEXTAUTH_URL, (value) => {
+      const isValid = isAbsoluteUrl(value);
+
+      return {
+        isValid,
+        message: isValid ? "Valid absolute URL" : "Must be a valid absolute http(s) URL",
+      };
+    }),
+    validateOptionalValue("GITHUB_APP_ID", process.env.GITHUB_APP_ID, (value) => {
+      const isValid = !isPlaceholder(value);
+
+      return {
+        isValid,
+        message: isValid ? "Configured" : "Should not be a placeholder value",
+      };
+    }),
+    validateOptionalValue(
+      "GITHUB_APP_PRIVATE_KEY",
+      process.env.GITHUB_APP_PRIVATE_KEY,
+      (value) => {
+        const isValid = !isPlaceholder(value);
+
+        return {
+          isValid,
+          message: isValid ? "Configured" : "Should not be a placeholder value",
+        };
+      },
+    ),
+  ];
+
+  const activeResults = results.filter((result): result is ValidationResult => result !== null);
+  const failures = activeResults.filter((result) => !result.isValid);
+
+  activeResults.forEach((result) => {
+    console.log(formatResult(result));
+  });
+
+  if (failures.length > 0) {
+    console.error(
+      colorize(`\nEnvironment validation failed with ${failures.length} issue(s).`, 31),
+>>>>>>> 470289f (chore: remove issue_*.md copies per PR review; keep validator focused)
+    );
+    process.exit(1);
+  }
+
+<<<<<<< HEAD
   console.log(`Loaded environment from: ${COLORS.green}${COLORS.bold}${loadedPath}${COLORS.reset}\n`);
 
   let errors = 0;
@@ -185,3 +294,9 @@ try {
   console.error("An unexpected error occurred during validation:", error);
   process.exit(1);
 }
+=======
+  console.log(colorize("\nEnvironment validation passed.", 32));
+}
+
+runValidation();
+>>>>>>> 470289f (chore: remove issue_*.md copies per PR review; keep validator focused)
