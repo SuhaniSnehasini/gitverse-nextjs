@@ -10,6 +10,9 @@ const securityHeaders = {
   "Expires": "0",
 };
 
+const getErrorMessage = (error: unknown, fallback: string) =>
+  error instanceof Error ? error.message : fallback;
+
 export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }
@@ -64,7 +67,7 @@ export async function GET(
 
     if (isHttpError(error)) {
       return NextResponse.json(
-        { error: error.message },
+        { error: getErrorMessage(error, "Request failed") },
         { status: error.status, headers: securityHeaders }
       );
     }
@@ -103,12 +106,12 @@ export async function DELETE(
 
     if (isHttpError(error)) {
       return NextResponse.json(
-        { error: error.message },
+        { error: getErrorMessage(error, "Request failed") },
         { status: error.status, headers: securityHeaders }
       );
     }
 
-    const errorMessage = error instanceof Error ? error.message : "";
+    const errorMessage = getErrorMessage(error, "");
 
     if (errorMessage === "Repository not found") {
       return NextResponse.json(
