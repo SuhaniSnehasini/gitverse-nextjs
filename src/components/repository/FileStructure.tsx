@@ -29,6 +29,22 @@ interface FileData {
   createdAt?: string;
 }
 
+interface FileChange {
+  path: string;
+  additions?: number;
+  deletions?: number;
+}
+
+interface CommitData {
+  fileChanges?: FileChange[];
+}
+
+interface RepositoryData {
+  name?: string;
+  files?: FileData[];
+  commits?: CommitData[];
+}
+
 interface FileNode {
   name: string;
   type: "file" | "folder";
@@ -139,7 +155,7 @@ const formatBytes = (bytes: number): string => {
 };
 
 interface FileStructureProps {
-  repository?: any;
+  repository?: RepositoryData;
 }
 
 export const FileStructure = ({ repository }: FileStructureProps) => {
@@ -193,9 +209,9 @@ export const FileStructure = ({ repository }: FileStructureProps) => {
   // Count commits for a specific file
   const getFileCommitCount = (filePath: string): number => {
     return (
-      repository?.commits?.reduce((count: number, commit: any) => {
+      repository?.commits?.reduce((count: number, commit: CommitData) => {
         const fileChanged = commit.fileChanges?.some(
-          (fc: any) => fc.path === filePath
+          (fc: FileChange) => fc.path === filePath
         );
         return fileChanged ? count + 1 : count;
       }, 0) || 0
@@ -206,8 +222,8 @@ export const FileStructure = ({ repository }: FileStructureProps) => {
   const getFileChangeStats = (filePath: string) => {
     let additions = 0;
     let deletions = 0;
-    repository?.commits?.forEach((commit: any) => {
-      commit.fileChanges?.forEach((change: any) => {
+    repository?.commits?.forEach((commit: CommitData) => {
+      commit.fileChanges?.forEach((change: FileChange) => {
         if (change.path === filePath) {
           additions += change.additions || 0;
           deletions += change.deletions || 0;
