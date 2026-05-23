@@ -80,6 +80,8 @@ export async function POST(request: NextRequest) {
         })) > 0;
 
       if (hasGoogleAccount) {
+        recordFailedAttempt(ip);
+
         return NextResponse.json(
           { error: "Email already exists. Please sign in with Google." },
           { status: 401 }
@@ -87,6 +89,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Fallback for legacy users during password → passwordHash migration
     const passwordHash = user.passwordHash || (user as any).password;
 
     if (!passwordHash) {
