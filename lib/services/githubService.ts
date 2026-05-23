@@ -190,7 +190,7 @@ export class GitHubService {
           const rateLimitRemaining = error.response?.headers?.["x-ratelimit-remaining"];
           const retryAfterHeader = error.response?.headers?.["retry-after"];
           if (status === 429 || rateLimitRemaining === "0" || retryAfterHeader) {
-            if (config.retryCount >= 3) {
+            if (config.rateLimitRetryCount >= 3) {
               const resetHeader = error.response?.headers?.["x-ratelimit-reset"];
               let retrySeconds = 60;
 
@@ -218,13 +218,13 @@ export class GitHubService {
           error.code === "ETIMEDOUT" ||
           !error.response
         ) {
-          if (config.retryCount < 3) {
-            config.retryCount += 1;
+          if (config.transientRetryCount < 3) {
+            config.transientRetryCount += 1;
             const retryAfter = error.response?.headers?.["retry-after"];
             const delayMs = retryAfter
               ? parseInt(retryAfter, 10) * 1000
-              : Math.min(30_000, Math.pow(2, config.retryCount) * 1000 + Math.random() * 1000);
-            console.log(`Retrying GitHub API request ${config.url} (attempt ${config.retryCount}) due to ${status || error.code}...`);
+              : Math.min(30_000, Math.pow(2, config.transientRetryCount) * 1000 + Math.random() * 1000);
+            console.log(`Retrying GitHub API request ${config.url} (attempt ${config.transientRetryCount}) due to ${status || error.code}...`);
             await new Promise((resolve) => setTimeout(resolve, delayMs));
             return this.client(config);
           }

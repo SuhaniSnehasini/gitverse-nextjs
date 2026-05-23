@@ -94,17 +94,33 @@ export async function POST(request: NextRequest) {
 
     // --- Update password and invalidate token atomically ---
     const passwordHash = await bcrypt.hash(password, 10);
+    const now = new Date();
 
-    await prisma.$transaction([
-      prisma.user.update({
+    const passwordWasReset = await prisma.$transaction(async (tx) => {
+      const consumedToken = await tx.passwordResetToken.updateMany({
+        where: {
+          id: record.id,
+          usedAt: null,
+          expiresAt: { gt: now },
+        },
+        data: { usedAt: now },
+      });
+
+      if (consumedToken.count !== 1) {
+        return false;
+      }
+
+      await tx.user.update({
         where: { id: record.userId },
         data: { passwordHash },
-      }),
-      prisma.passwordResetToken.update({
-        where: { id: record.id },
-        data: { usedAt: new Date() },
-      }),
-    ]);
+      });
+
+      return true;
+    });
+
+    if (!passwordWasReset) {
+      return invalidTokenResponse;
+    }
 
     return NextResponse.json({
       message: "Password updated successfully. You can now sign in.",
