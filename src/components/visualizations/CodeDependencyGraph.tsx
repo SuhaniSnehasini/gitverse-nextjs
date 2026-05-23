@@ -2,107 +2,9 @@ import { useEffect, useRef } from "react";
 import * as d3 from "d3";
 import { Card, EmptyState } from "@/components/ui";
 import { Network } from "lucide-react";
+import { GraphAnalyzer } from "@/utils/graphAnalyzer";
 
-interface Node {
-  id: string;
-  name: string;
-  type: "folder" | "file";
-  size: number;
-  path: string;
-}
 
-interface Link {
-  source: string;
-  target: string;
-  strength: number;
-}
-
-interface GraphData {
-  nodes: Node[];
-  links: Link[];
-}
-
-// Generate dependency graph from repository files
-const generateDependencyGraph = (repository: any): GraphData => {
-  const nodes: Node[] = [];
-  const links: Link[] = [];
-
-  if (!repository?.files || repository.files.length === 0) {
-    return { nodes: [], links: [] };
-  }
-
-  // Extract unique folders and create nodes
-  const files = repository.files as any[];
-
-  // Create folder nodes
-  const folderPaths = new Set<string>();
-  files.forEach((file) => {
-    const parts = file.path.split("/");
-    for (let i = 1; i < parts.length; i++) {
-      const folderPath = parts.slice(0, i).join("/");
-      folderPaths.add(folderPath);
-    }
-  });
-
-  // Add folder nodes
-  folderPaths.forEach((folderPath) => {
-    const parts = folderPath.split("/");
-    const folderName = parts[parts.length - 1];
-    nodes.push({
-      id: `folder-${folderPath}`,
-      name: folderName,
-      type: "folder",
-      size: 100,
-      path: folderPath,
-    });
-  });
-
-  // Add file nodes (limit to top files by lines to avoid clutter)
-  const topFiles = files
-    .sort((a, b) => (b.lines || 0) - (a.lines || 0))
-    .slice(0, 30);
-
-  topFiles.forEach((file) => {
-    const fileName = file.path.split("/").pop() || file.path;
-    nodes.push({
-      id: `file-${file.path}`,
-      name: fileName,
-      type: "file",
-      size: Math.min(Math.max(file.lines / 10 || 50, 40), 150),
-      path: file.path,
-    });
-  });
-
-  // Create links: files to their parent folders
-  topFiles.forEach((file) => {
-    const parts = file.path.split("/");
-    if (parts.length > 1) {
-      const parentFolder = parts.slice(0, -1).join("/");
-      links.push({
-        source: `file-${file.path}`,
-        target: `folder-${parentFolder}`,
-        strength: 1,
-      });
-    }
-  });
-
-  // Create links between folders (parent-child relationships)
-  folderPaths.forEach((folderPath) => {
-    const parts = folderPath.split("/");
-    if (parts.length > 1) {
-      const parentFolder = parts.slice(0, -1).join("/");
-      if (folderPaths.has(parentFolder)) {
-        links.push({
-          source: `folder-${folderPath}`,
-          target: `folder-${parentFolder}`,
-          strength: 0.8,
-        });
-      }
-    }
-  });
-
-  return { nodes, links };
-};
 
 interface CodeDependencyGraphProps {
   repository?: any;
@@ -112,7 +14,8 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
 
-  const graphData = generateDependencyGraph(repository);
+  const graphAnalyzer = new GraphAnalyzer();
+  const graphData = graphAnalyzer.buildDependencyGraph(repository?.files || []);
 
   useEffect(() => {
     if (!svgRef.current) return;
@@ -171,8 +74,9 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
       .selectAll("line")
       .data(links)
       .join("line")
-      .attr("stroke", "rgba(255,255,255,0.2)")
+      .attr("stroke", (d: any) => d.isCyclic ? "#ef4444" : "rgba(255,255,255,0.2)")
       .attr("stroke-width", (d: any) => d.strength * 2)
+      .attr("stroke-dasharray", (d: any) => d.isCyclic ? "5,5" : "none")
       .attr("stroke-opacity", 0.6);
 
     // Draw nodes
@@ -269,7 +173,7 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
         link
           .transition()
           .duration(200)
-          .attr("stroke", "rgba(255,255,255,0.2)")
+          .attr("stroke", (l: any) => l.isCyclic ? "#ef4444" : "rgba(255,255,255,0.2)")
           .attr("stroke-opacity", 0.6);
 
         if (tooltipRef.current) {
