@@ -2,8 +2,9 @@
 
 export const dynamic = "force-dynamic";
 import { Skeleton } from "@/components/ui/Skeleton";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { isValidGithubUrl } from "@/lib/utils/validators";
 import {
   GitBranch,
   TrendingUp,
@@ -24,12 +25,12 @@ import {
   Button,
   Input,
   EmptyState,
-  Skeleton,
 } from "@/components/ui";
 import { useAuth } from "@/contexts/AuthContext";
 import { buildApiUrl } from "@/services/apiConfig";
 import axios from "axios";
 import { toast } from "@/hooks/use-toast";
+import { ShortcutHint } from "@/components/ShortcutHint";
 
 interface Repository {
   id: string;
@@ -49,6 +50,7 @@ interface Repository {
 export default function Dashboard() {
   const { user } = useAuth();
   const router = useRouter();
+  const searchRef = useRef<HTMLInputElement>(null);
   const [repoUrl, setRepoUrl] = useState("");
   const [repoScope, setRepoScope] = useState("");
   const [repositories, setRepositories] = useState<Repository[]>([]);
@@ -73,12 +75,9 @@ export default function Dashboard() {
       }
 
       if (
-        e.key === "/" &&
-        !e.ctrlKey &&
-        !e.metaKey &&
-        !e.altKey &&
-        !e.shiftKey &&
-        !isTyping
+        e.key === "Escape" &&
+        isTyping &&
+        active === searchRef.current
       ) {
         setRepoUrl("");
         setRepoScope("");
@@ -155,46 +154,22 @@ export default function Dashboard() {
     },
   ];
 
-  const recentRepositories = Array.isArray(repositories)
-    ? repositories.slice(0, 3)
-    : [];
-
-  const formatTimeAgo = (date: string) => {
-    const now = new Date();
-    const then = new Date(date);
-    const diffInMinutes = Math.floor(
-      (now.getTime() - then.getTime()) / (1000 * 60)
-    );
-
-    if (diffInMinutes < 1) return "Just now";
-    if (diffInMinutes < 60) return `${diffInMinutes}m ago`;
-    const diffInHours = Math.floor(diffInMinutes / 60);
-    if (diffInHours < 24) return `${diffInHours}h ago`;
-    const diffInDays = Math.floor(diffInHours / 24);
-    if (diffInDays < 7) return `${diffInDays}d ago`;
-    return then.toLocaleDateString();
-  };
-
-  const recentActivity = Array.isArray(repositories)
-    ? repositories
-      .filter((r: any) => r.status === "completed")
-      .slice(0, 5)
-      .map((repo: any) => ({
-        action: "Analyzed",
-        repo: repo.name,
-        time: formatTimeAgo(repo.lastAnalyzedAt || repo.createdAt),
-        status: repo.status,
-      }))
-    : [];
-
   const handleAnalyze = async () => {
     if (!repoUrl.trim()) return;
+
+    if (!isValidGithubUrl(repoUrl)) {
+      toast({
+        title: "Invalid URL",
+        description: "Please enter a valid GitHub repository URL (e.g., https://github.com/owner/repo).",
+        variant: "destructive",
+      });
+      return;
+    }
 
     setAnalyzing(true);
     try {
       const token = localStorage.getItem("gitverse_token");
 
-      // Extract repo name from URL
       const urlParts = repoUrl.trim().split("/");
       const repoName = urlParts[urlParts.length - 1];
 
@@ -211,18 +186,14 @@ export default function Dashboard() {
         }
       );
 
-      // Check if this is an existing repository
       const isExisting = repositories.some(
         (r: any) => r.url === repoUrl.trim()
       );
 
-      // Refresh repositories list
       await fetchRepositories();
 
-      // Navigate to the repository
       router.push(`/repo/${response.data.repository.id}`);
 
-      // Show appropriate message
       if (isExisting) {
         console.log("Navigating to existing repository");
       }
@@ -231,7 +202,14 @@ export default function Dashboard() {
       setRepoScope("");
     } catch (error: any) {
       console.error("Error creating repository:", error);
-      const errMsg = error.response?.data?.error || error.response?.data?.message || error.message || "Failed to analyze repository";
+      
+      let errMsg = "Failed to analyze repository";
+      if (error.response?.status === 404 || error.response?.data?.error === "NOT_FOUND") {
+        errMsg = "Repository not found. Please ensure the URL is correct and the repository is public.";
+      } else {
+        errMsg = error.response?.data?.message || error.response?.data?.error || error.message || errMsg;
+      }
+
       toast({
         title: "Analysis Failed",
         description: errMsg,
