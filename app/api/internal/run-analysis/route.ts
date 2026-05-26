@@ -5,150 +5,64 @@ import { repositoryService } from "@/lib/services/repositoryService";
 
 export const runtime = "nodejs";
 
-// ---------------------------------------------------------------------------
-// Constants
-// ---------------------------------------------------------------------------
+// Global catch — prevents Node 15+ from crashing the request on an
+// unhandled rejection that made it past the promise-gap fixes above.
+process.on("unhandledRejection", (reason) => {
+  console.error("Unhandled rejection in run-analysis route:", reason);
+});
 
-const WORKER_TIMEOUT_MS = 55_000; // 55 s — stay under Vercel's 60 s limit
-const LOG_PREFIX = "[run-analysis]";
-
-// ---------------------------------------------------------------------------
-// Structured logger — all output goes to stdout as JSON for log aggregators
-// (Vercel Log Drains, Datadog, etc.)
-// ---------------------------------------------------------------------------
-
-type LogLevel = "info" | "warn" | "error";
-
-function log(
-  level: LogLevel,
-  message: string,
-  meta: Record<string, unknown> = {},
-) {
-  // Never log secrets — strip known sensitive keys defensively
-  const { secret, authorization, ...safeMeta } = meta as any;
-  console[level === "error" ? "error" : "log"](
-    JSON.stringify({
-      level,
-      ts: new Date().toISOString(),
-      source: LOG_PREFIX,
-      message,
-      ...safeMeta,
-    }),
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Auth
-// ---------------------------------------------------------------------------
-
-/**
- * Constant-time string comparison — prevents timing attacks.
- * Returns false if either value is missing.
- */
-function safeEqual(a: string | null | undefined, b: string): boolean {
-  if (!a) return false;
-  try {
-    const bufA = Buffer.from(a);
-    const bufB = Buffer.from(b);
-    // Buffers must be the same length for timingSafeEqual
-    if (bufA.length !== bufB.length) return false;
-    return crypto.timingSafeEqual(bufA, bufB);
-  } catch {
-    return false;
+  // Fail-closed: if no secret is configured in production, deny all requests.
+  // An unset secret must never silently open access in any deployed environment.
+  if (!configuredSecret) {
+    if (process.env.NODE_ENV === "production") {
+      console.error(
+        "[run-analysis] ANALYSIS_RUNNER_SECRET is not set. " +
+          "All requests are rejected in production until the secret is configured."
+      );
+      return false;
+    }
+    // Allow unauthenticated calls only in local development.
+    return true;
   }
-}
 
-/**
- * Returns true when the request is authorised to trigger analysis.
- *
- * Priority order:
- *  1. Vercel Cron signature (production only) — cryptographically verified
- *  2. x-analysis-runner-secret header — constant-time compared
- *  3. Dev-only fallback — explicitly blocked in production
- *
- * NOTE: query-parameter secrets are intentionally NOT supported — they leak
- * into server logs, CDN logs, and Referer headers.
- */
-function isAuthorized(request: NextRequest): {
-  ok: boolean;
-  reason: string;
-} {
+  // Secret is configured -- verify it on every request, regardless of HTTP method.
+  // Vercel Cron sends plain GET requests; the recommended approach is to set
+  // CRON_SECRET equal to ANALYSIS_RUNNER_SECRET so Vercel automatically
+  // injects "Authorization: Bearer <CRON_SECRET>" on each cron invocation.
+  const authHeader = request.headers.get("authorization");
+  if (authHeader === `Bearer ${configuredSecret}`) return true;
+
+  // Also accept the value in the custom header for non-cron callers
+  // (e.g. a GitHub Actions workflow or an internal service).
+const HEARTBEAT_INTERVAL_MS = 30_000;
+
+function isAuthorized(request: NextRequest): boolean {
   const configuredSecret = process.env.ANALYSIS_RUNNER_SECRET;
 
-  // --- 1. Vercel Cron (GET only, production only) ---
-  // Vercel injects a signed `x-vercel-signature` on cron requests in addition
-  // to setting the vercel-cron User-Agent.  Verify the signature when present.
-  if (request.method === "GET") {
-    const vercelSig = request.headers.get("x-vercel-signature");
+  // When no secret is configured, allow in dev or via Vercel Cron on Vercel.
+  if (!configuredSecret) {
+    if (process.env.NODE_ENV !== "production") return true;
+
     const ua = (request.headers.get("user-agent") || "").toLowerCase();
-    const isVercelEnv =
-      process.env.VERCEL === "1" && process.env.VERCEL_ENV === "production";
-
-    if (isVercelEnv && ua.includes("vercel-cron/")) {
-      // If Vercel provides a signature and we have a secret, verify it.
-      // If no signature is present we still accept — plain cron without sig.
-      if (vercelSig && configuredSecret) {
-        const expected = crypto
-          .createHmac("sha256", configuredSecret)
-          .update(request.url)
-          .digest("hex");
-        if (!safeEqual(vercelSig, expected)) {
-          return { ok: false, reason: "invalid_cron_signature" };
-        }
-      }
-      return { ok: true, reason: "vercel_cron" };
+    if (
+      request.method === "GET" &&
+      process.env.VERCEL === "1" &&
+      process.env.VERCEL_ENV === "production" &&
+      ua.includes("vercel-cron/")
+    ) {
+      return true;
     }
+
+    return false;
   }
 
-  // --- 2. Secret header (all environments, all methods) ---
-  if (configuredSecret) {
-    const headerSecret = request.headers.get("x-analysis-runner-secret");
-    if (safeEqual(headerSecret, configuredSecret)) {
-      return { ok: true, reason: "secret_header" };
-    }
-    return { ok: false, reason: "invalid_secret" };
-  }
+  // When a secret is configured, always require it, regardless of
+  // HTTP method or User-Agent. Vercel Cron jobs should include the
+  // secret as a query parameter in the cron path.
+  const headerSecret = request.headers.get("x-analysis-runner-secret");
+  if (headerSecret === configuredSecret) return true;
 
-  // --- 3. Dev-only fallback ---
-  // Explicitly blocked in production even if no secret is configured,
-  // so misconfigured staging/preview deployments stay closed.
-  if (process.env.NODE_ENV !== "production") {
-    return { ok: true, reason: "dev_no_secret" };
-  }
-
-  return { ok: false, reason: "no_secret_configured" };
-}
-
-// ---------------------------------------------------------------------------
-// Timeout helper
-// ---------------------------------------------------------------------------
-
-/**
- * Races `promise` against a hard deadline.
- * Rejects with a typed error so callers can distinguish timeout from other
- * failures and mark the job accordingly.
- */
-function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
-  return new Promise<T>((resolve, reject) => {
-    const timer = setTimeout(() => {
-      reject(
-        Object.assign(new Error(`Timed out after ${ms} ms`), {
-          code: "WORKER_TIMEOUT",
-        }),
-      );
-    }, ms);
-
-    promise.then(
-      (v) => {
-        clearTimeout(timer);
-        resolve(v);
-      },
-      (e) => {
-        clearTimeout(timer);
-        reject(e);
-      },
-    );
-  });
+  return false;
 }
 
 // ---------------------------------------------------------------------------
@@ -195,15 +109,8 @@ async function runOnce(request: NextRequest): Promise<NextResponse> {
     return new NextResponse(null, { status: 204 });
   }
 
-  log("info", "Job claimed", {
-    workerId,
-    jobId: job.id,
-    repositoryId: job.repositoryId,
-    attempt: job.attempts,
-    maxAttempts: job.maxAttempts,
-  });
+  let heartbeatTimer: NodeJS.Timeout | null = null;
 
-  // Initial progress ping — confirms the job is alive
   try {
     await analysisJobService.updateProgress({
       jobId: job.id,
@@ -213,12 +120,21 @@ async function runOnce(request: NextRequest): Promise<NextResponse> {
         progressMessage: job.progressMessage ?? "Starting analysis…",
       },
     });
-  } catch (err: any) {
-    // Non-fatal — log and continue
-    log("warn", "Failed to send initial progress update", {
-      workerId,
-      jobId: job.id,
-      error: err?.message ?? String(err),
+
+    heartbeatTimer = setInterval(() => {
+      analysisJobService
+        .heartbeat({ jobId: job.id, workerId })
+        .catch((e) => console.error("serverless heartbeat failed", e));
+    }, HEARTBEAT_INTERVAL_MS);
+
+    await repositoryService.analyzeRepository(job.repositoryId, {
+      onProgress: async (update) => {
+        await analysisJobService.updateProgress({
+          jobId: job.id,
+          workerId,
+          update,
+        });
+      },
     });
   }
 
@@ -251,10 +167,17 @@ async function runOnce(request: NextRequest): Promise<NextResponse> {
       WORKER_TIMEOUT_MS,
     );
 
+    if (heartbeatTimer) clearInterval(heartbeatTimer);
+    heartbeatTimer = null;
+
     await analysisJobService.markDone({ jobId: job.id, workerId });
 
-    const durationMs = Date.now() - startMs;
-    log("info", "Job completed", { workerId, jobId: job.id, durationMs });
+    return NextResponse.json({ ok: true, jobId: job.id, status: "DONE" });
+  } catch (error: any) {
+    if (heartbeatTimer) clearInterval(heartbeatTimer);
+    heartbeatTimer = null;
+
+    const message = String(error?.message || error || "Unknown error");
 
     return NextResponse.json({
       ok: true,
