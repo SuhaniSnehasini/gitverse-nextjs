@@ -1,78 +1,58 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isHttpError, requireAuth } from "@/lib/middleware";
+import { isHttpError, requireAuth , sanitizeError } from "@/lib/middleware";
 import { getGeminiService } from "@/lib/services/geminiService";
 import { repositoryService } from "@/lib/services/repositoryService";
 
 export async function POST(request: NextRequest) {
   try {
-
     const user = await requireAuth(request);
-    let body;
+    const body = await request.json();
 
-    try {
-      body = await request.json();
-    } catch {
+    /*
+     * Chat request validation: every POST must include a `messages` array.
+     * Each entry must be an object with non-empty `role` and `content` strings
+     * so downstream handlers never process malformed conversation payloads.
+     */
+    const { messages } = body;
+    if (!messages || !Array.isArray(messages)) {
       return NextResponse.json(
-        { error: "Invalid JSON body" },
+        { error: "messages is required and must be an array" },
         { status: 400 }
       );
     }
-
-    const { repositoryId, question, conversationHistory, prompt } = body || {};
-
-    // Validating prompt type if provided
-    if (prompt !== undefined && typeof prompt !== "string") {
-      return NextResponse.json(
-        { error: "Prompt must be a string" },
-        { status: 400 }
-      );
+    for (const message of messages) {
+      if (
+        !message ||
+        typeof message !== "object" ||
+        typeof message.role !== "string" ||
+        !message.role.trim() ||
+        typeof message.content !== "string" ||
+        !message.content.trim()
+      ) {
+        return NextResponse.json(
+          { error: "Each message must include role and content" },
+          { status: 400 }
+        );
+      }
     }
 
-    // Free-form mode: client provides a prebuilt prompt
+    const { repositoryId, question, conversationHistory, prompt } = body;
+
+    // Free-form mode: client provides a prebuilt prompt.
     if (typeof prompt === "string" && prompt.trim()) {
-      const response = await getGeminiService().chatRaw(prompt);
-
+      const response = await getGeminiService().chatRaw(prompt, messages);
       return NextResponse.json({ response });
     }
 
-    // Validating repositoryId
-    const parsedRepositoryId = Number(repositoryId);
-
-    if (
-      typeof repositoryId !== "string" ||
-      !repositoryId.trim() ||
-      Number.isNaN(parsedRepositoryId)
-    ) {
+    if (!repositoryId || !question) {
       return NextResponse.json(
-        { error: "Valid repository ID is required" },
-        { status: 400 }
-      );
-    }
-
-    // Validating question
-    if (
-      typeof question !== "string" ||
-      !question.trim()
-    ) {
-      return NextResponse.json(
-        { error: "Valid question is required" },
-        { status: 400 }
-      );
-    }
-
-    // Validating conversationHistory 
-    if (
-      conversationHistory !== undefined &&
-      !Array.isArray(conversationHistory)
-    ) {
-      return NextResponse.json(
-        { error: "conversationHistory must be an array" },
+        { error: "Repository ID and question are required" },
         { status: 400 }
       );
     }
 
     const repository = await repositoryService.getRepository(
-      parsedRepositoryId,
+      repositoryId,
       user.userId
     );
 
@@ -84,33 +64,28 @@ export async function POST(request: NextRequest) {
     }
 
     const context = {
-      files: repository.files
-        .slice(0, 20)
-        .map((f: { path: string }) => f.path),
-
+      files: repository.files.slice(0, 20).map((f: { path: string }) => f.path),
       recentCommits: repository.commits
         .slice(0, 5)
         .map(
           (c: { shortHash: string; message: string }) =>
             `${c.shortHash}: ${c.message}`
         ),
-
       contributors: repository.contributors.map(
         (c: { name: string }) => c.name
       ),
     };
 
     const response = await getGeminiService().chatAboutRepository({
-      repositoryId: parsedRepositoryId,
+      repositoryId,
       question,
       conversationHistory,
       context,
     });
 
     return NextResponse.json({ response, question });
-
   } catch (error: any) {
-    console.error("AI chat error:", error);
+    console.error("AI chat error:", sanitizeError(error));
 
     if (isHttpError(error)) {
       return NextResponse.json(
