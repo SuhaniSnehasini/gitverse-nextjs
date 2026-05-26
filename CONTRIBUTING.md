@@ -40,10 +40,10 @@ Ensure you have the following installed on your system:
 
 ### 2. Fork & Clone
 
-Fork the repository on GitHub, then clone your fork locally:
+Fork the repository on GitHub, then clone your fork or the upstream repository locally:
 
 ```bash
-git clone https://github.com/SatyamPandey-07/gitverse-nextjs.git
+git clone https://github.com/<your-username>/gitverse-nextjs.git
 cd gitverse-nextjs
 ```
 
