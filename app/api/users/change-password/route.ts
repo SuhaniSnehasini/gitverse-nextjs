@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import prisma from "@/lib/prisma";
-import { errorResponse, requireAuth, sanitizeError } from "@/lib/middleware";
+import { requireAuth, sanitizeError } from "@/lib/middleware";
 
 export async function POST(request: NextRequest) {
   try {
@@ -28,11 +28,15 @@ export async function POST(request: NextRequest) {
     });
 
     if (!userDetails) {
-      return NextResponse.json({ message: "User not found" }, { status: 404 });
+      return NextResponse.json(
+        { message: "User not found" },
+        { status: 404 }
+      );
     }
 
-    const passwordHash =
-      userDetails.passwordHash || (userDetails as any).password;
+    const passwordHash = userDetails.passwordHash;
+
+    // Existing password users must verify current password
     if (passwordHash) {
       if (!currentPassword) {
         return NextResponse.json(
@@ -58,12 +62,18 @@ export async function POST(request: NextRequest) {
 
     await prisma.user.update({
       where: { id: user.userId },
-      data: { passwordHash: hashedPassword },
+      data: {
+        passwordHash: hashedPassword,
+        tokenVersion: { increment: 1 },
+      },
     });
 
-    return NextResponse.json({ message: "Password changed successfully" });
+    return NextResponse.json({
+      message: "Password changed successfully",
+    });
   } catch (error: any) {
     console.error("Error changing password:", sanitizeError(error));
+
     return NextResponse.json(
       { message: "Failed to change password" },
       { status: 500 }
