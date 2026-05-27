@@ -1,57 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
+import {
+  isAnalysisRunnerAuthorized,
+  registerUnhandledRejectionLogger,
+} from "@/lib/utils/analysisRunner";
 import { analysisJobService } from "@/lib/services/analysisJobService";
 import { repositoryService } from "@/lib/services/repositoryService";
 
 export const runtime = "nodejs";
 
-// Global catch — prevents Node 15+ from crashing the request on an
-// unhandled rejection that made it past the promise-gap fixes above.
-process.on("unhandledRejection", (reason) => {
-  console.error("Unhandled rejection in run-analysis route:", reason);
-});
 
-const HEARTBEAT_INTERVAL_MS = 30_000;
-
-function isAuthorized(request: NextRequest): boolean {
-  const configuredSecret = process.env.ANALYSIS_RUNNER_SECRET;
-
-  if (!configuredSecret) {
-    if (process.env.NODE_ENV === "production") {
-      console.error(
-        "[run-analysis] ANALYSIS_RUNNER_SECRET is not set. " +
-          "All requests are rejected in production until the secret is configured."
-      );
-      return false;
-    }
-    return true;
-  }
-
-  const authHeader = request.headers.get("authorization");
-  if (authHeader === `Bearer ${configuredSecret}`) return true;
-
-  const headerSecret = request.headers.get("x-analysis-runner-secret");
-  if (headerSecret === configuredSecret) return true;
-
-  return false;
-}
 
 // ---------------------------------------------------------------------------
 // Core handler
 // ---------------------------------------------------------------------------
 
 async function runOnce(request: NextRequest): Promise<NextResponse> {
-  const startMs = Date.now();
-
-  // Auth
-  const auth = isAuthorized(request);
-  if (!auth.ok) {
-    log("warn", "Unauthorized request", {
-      reason: auth.reason,
-      method: request.method,
-      // Log the IP for rate-limiting / alerting — never the secret
-      ip: request.headers.get("x-forwarded-for") ?? "unknown",
-    });
+  registerUnhandledRejectionLogger();
+  if (!isAnalysisRunnerAuthorized(request)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
