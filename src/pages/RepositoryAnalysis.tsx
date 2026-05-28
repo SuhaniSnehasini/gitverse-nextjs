@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 export const dynamic = "force-dynamic";
 import { useState, useEffect, useRef, useMemo } from "react";
@@ -346,18 +346,19 @@ export default function RepositoryAnalysis() {
           setError(response.data.latestJob.error || "Analysis failed. Please try again later.");
         }
       }
-    } catch (error: any) {
-      setError(
-        error?.response?.data?.error ||
-        "Failed to load repository. Check your connection and try again."
-      );
-
-      toast({
-        title: "Error",
-        description: "Failed to load repository data",
-      console.log("Repository data:", response.data);
+      setLoading(false);
     } catch (err: any) {
       console.error("Error fetching repository:", err);
+
+      const isColdStart = err.response?.data?.error === "DATABASE_COLD_START";
+      
+      if (isColdStart) {
+        setError("Waking up database... Please wait.");
+        // Auto-retry in 3 seconds. Do not set loading to false so spinner stays.
+        setTimeout(fetchRepository, 3000);
+        return;
+      }
+
       setError(
         err.response?.data?.error ||
           err.response?.data?.message ||
@@ -369,7 +370,6 @@ export default function RepositoryAnalysis() {
         description: err.response?.data?.error || err.response?.data?.message || err.message || "Failed to load repository data.",
         variant: "destructive",
       });
-    } finally {
       setLoading(false);
     }
   };
@@ -438,17 +438,6 @@ export default function RepositoryAnalysis() {
           variant: "destructive",
         });
       }
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: "Failed to fetch analysis job status",
-        setError(nextJob?.error || "Analysis failed. Please try again later.");
-        toast({
-          title: "Analysis failed",
-          description: nextJob?.error || nextJob?.progressMessage || "The repository analysis encountered an unexpected error.",
-          variant: "destructive",
-        });
-      }
     } catch (err: any) {
       console.error("Error fetching analysis job:", err);
       
@@ -457,11 +446,8 @@ export default function RepositoryAnalysis() {
       // 1. Surface inline error state
       setError(errorMessage);
       
-      // 2. Stop polling to prevent spamming the user/server
-      if (pollingIntervalRef.current) {
-        clearInterval(pollingIntervalRef.current);
-      }
-      setIsPolling(false); // If you are tracking polling via a boolean state
+      // 2. Stop polling
+      setIsAnalyzing(false);
 
       // 3. Show a one-time toast notification
       toast({
