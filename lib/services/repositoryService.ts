@@ -281,63 +281,13 @@ if (existingRepositoryName) {
       });
       const commits = await gitService.getCommits("--all", 1000);
 
-      // IMPORTANT: Do not load *all* existing commits for the repo.
-      // On large repos this can be huge and cause OOM/timeouts. We only need to
-      // know which of the commits we just fetched already exist.
-      const existingCommits =
-        commits.length > 0
-          ? await prisma.commit.findMany({
-              where: {
-                repositoryId,
-                hash: {
-                  in: commits.map((commit: { hash: string }) => commit.hash),
-                },
-              },
-              select: { hash: true },
-            })
-          : [];
-      const existingHashes = new Set(existingCommits.map((c) => c.hash));
-
-      // Filter out commits that already exist — we track these for progress, not for writes.
-      // All commits are inserted atomically inside the write transaction below.
-      const newCommits = commits.filter(
-        (commit: { hash: string }) => !existingHashes.has(commit.hash),
-      );
-
-      checkAborted();
-const latestCommitHashes = commits.map((commit: { hash: string }) => commit.hash);
-      // Enforce commit retention window
-     
-if (latestCommitHashes.length > 0) { 
-await prisma.$transaction([
-  prisma.fileChange.deleteMany({
-    where: {
-      commit: {
-        repositoryId,
-        hash: {
-          notIn: latestCommitHashes,
-        },
-      },
-    },
-  }),
-
-  prisma.commit.deleteMany({
-    where: {
-      repositoryId,
-      hash: {
-        notIn: latestCommitHashes,
-      },
-    },
-  }),
-]);
-}
-     
-      // Analyze files
       checkAborted();
 
-      await report({ progressPercent: 65, progressMessage: "Scanning files" });
+      await report({
+        progressPercent: 65,
+        progressMessage: "Scanning files",
+      });
       const files = await gitService.getFileTree(opts?.scope);
-
       checkAborted();
 
       await report({
