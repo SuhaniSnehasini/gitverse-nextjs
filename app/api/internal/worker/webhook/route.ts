@@ -19,9 +19,12 @@ let activeJobs = 0;
 
 function isInternalAuthorized(request: NextRequest): boolean {
   const authHeader = request.headers.get("authorization");
-  const secret = process.env.GITHUB_WEBHOOK_SECRET || process.env.JWT_SECRET || "";
+  const secret = process.env.INTERNAL_WORKER_SECRET;
   
-  if (!secret) return false;
+  if (!secret) {
+    console.error("[CRITICAL] INTERNAL_WORKER_SECRET not configured");
+    return false;
+  }
   
   const expectedToken = `Bearer ${crypto.createHash('sha256').update(secret).digest('hex')}`;
   
