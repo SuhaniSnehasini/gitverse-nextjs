@@ -5,6 +5,7 @@ const requiredEnvVars = [
   "NEXTAUTH_URL",
   "GEMINI_API_KEY",
   "INTERNAL_WORKER_SECRET",
+  "TOKEN_ENCRYPTION_KEY",
 ] as const;
 
 function shouldSkipEnvValidation() {
