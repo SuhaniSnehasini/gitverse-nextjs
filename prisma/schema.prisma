@@ -54,13 +54,14 @@ model User {
 }
 
 model GitHubAccount {
-  id           Int      @id @default(autoincrement())
-  userId       Int      @unique @map("user_id")
-  githubUserId BigInt   @unique @map("github_user_id")
-  username     String   @map("username")
-  accessToken  String   @map("access_token") @db.Text
-  createdAt    DateTime @default(now()) @map("created_at")
-  updatedAt    DateTime @updatedAt @map("updated_at")
+  id             Int      @id @default(autoincrement())
+  userId         Int      @unique @map("user_id")
+  githubUserId   BigInt   @unique @map("github_user_id")
+  username       String   @map("username")
+  accessToken    String   @map("access_token") @db.Text
+  tokenEncrypted Boolean  @default(false) @map("token_encrypted")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
